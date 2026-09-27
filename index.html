@@ -436,6 +436,16 @@
     </section>
 
     <section class="card">
+      <div class="section-head"><div><h2>🥗 Eating goal</h2><div class="sub">Days per week you aim to eat right</div></div></div>
+      <ul class="edit-list" id="editEat"></ul>
+      <div class="add-row">
+        <input class="field" type="date" id="eatNewDate" aria-label="Week the new eating goal starts">
+        <button class="btn secondary" id="eatAdd" type="button">+ Add change</button>
+      </div>
+      <p class="help" style="margin:8px 0 0">Pick any day and the change starts that Sunday–Saturday week.</p>
+    </section>
+
+    <section class="card">
       <div class="section-head"><div><h2>⚡ Laser schedule</h2><div class="sub">Sessions per week, by month</div></div></div>
       <ul class="edit-list" id="editLaser"></ul>
       <button class="btn secondary" id="laserAddMonth" style="width:100%;margin-top:8px">+ Add a month</button>
@@ -535,6 +545,12 @@
   const $ = id => document.getElementById(id);
   const goal = () => state.settings.goal; // base goal (before any scheduled change)
   // Workout goal for a given week: the latest scheduled change starting on/before it, else the base goal.
+  // Weekly "Ate right" target: the latest change starting on/before this week, else every day.
+  function eatGoalFor(ws) {
+    const k = key(ws);
+    const from = Object.keys(state.settings.eatGoals).sort().filter(f => f <= k).pop();
+    return from ? state.settings.eatGoals[from] : 7;
+  }
   function goalFor(ws) {
     const k = key(ws);
     const from = Object.keys(state.settings.goalChanges).sort().filter(f => f <= k).pop();
@@ -564,6 +580,7 @@
     if (!data.settings.laser) data.settings.laser = { "2026-10": 3, "2026-11": 2, "2026-12": 1 };
     // Per-week exceptions to the month schedule, keyed by week start (Sunday).
     if (!data.settings.goalChanges) data.settings.goalChanges = { "2026-11-01": 4 };
+    if (!data.settings.eatGoals) data.settings.eatGoals = { "2026-09-27": 5, "2026-10-04": 7, "2026-10-25": 6 };
     if (!data.settings.laserWeeks) data.settings.laserWeeks = { "2026-09-27": 3 };
     return data;
   }
@@ -728,9 +745,10 @@
     stats.innerHTML = "";
     HABITS.forEach(hb => {
       const n = week.habits[hb.id].filter(Boolean).length;
+      const target = hb.id === "eat" ? eatGoalFor(currentWeek) : 7;
       const row = document.createElement("div");
-      row.innerHTML = '<div class="stat-top"><b>' + hb.icon + " " + hb.label + "</b><span>" + n + "/7</span></div>" +
-        '<div class="meter"><div style="width:' + (n / 7 * 100) + "%;background:" + hb.color + '"></div></div>';
+      row.innerHTML = '<div class="stat-top"><b>' + hb.icon + " " + hb.label + "</b><span>" + n + "/" + target + "</span></div>" +
+        '<div class="meter"><div style="width:' + Math.min(100, n / target * 100) + "%;background:" + hb.color + '"></div></div>';
       stats.appendChild(row);
     });
     const lg = laserGoal(currentWeek);
@@ -792,12 +810,17 @@
       let hint = on ? "Done ✓" : hb.hint;
       const sc = week.stepCounts[selectedDay];
       if (hb.id === "steps" && sc != null) hint = sc.toLocaleString() + " steps" + (on ? " ✓" : " synced");
+      if (hb.id === "eat") {
+        const eg = eatGoalFor(currentWeek);
+        hint = (on ? "Done ✓ · " : "") + week.habits.eat.filter(Boolean).length + " of " + eg + " days this week";
+      }
       b.innerHTML = '<span class="icon">' + hb.icon + '</span><span class="txt"><div class="title">' + hb.label +
         '</div><div class="hint">' + hint + '</div></span><span class="check">' + (on ? "✓" : "") + "</span>";
       b.addEventListener("click", () => {
         week.habits[hb.id][selectedDay] = !on;
         save(); render();
         if (!on && HABITS.every(x => week.habits[x.id][selectedDay])) toast("🎉 Perfect day!");
+        else if (!on && hb.id === "eat" && week.habits.eat.filter(Boolean).length === eatGoalFor(currentWeek)) toast("🥗 Eating goal hit: " + eatGoalFor(currentWeek) + " days this week!");
       });
       tiles.appendChild(b);
     });
@@ -1267,6 +1290,29 @@
       gl.appendChild(li);
     });
 
+    // eating goal schedule
+    const el = $("editEat");
+    el.innerHTML = "";
+    const eatKeys = Object.keys(state.settings.eatGoals).sort();
+    if (!eatKeys.length) el.innerHTML = '<li class="sub">Every day (7×) until you add a change.</li>';
+    eatKeys.forEach((f, i) => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "when";
+      const next = eatKeys[i + 1];
+      label.textContent = fmt(parseKey(f)) + (next ? " – " + fmt(addDays(parseKey(next), -1)) : " onward");
+      const val = document.createElement("b");
+      val.style.minWidth = "44px"; val.style.textAlign = "center";
+      val.textContent = state.settings.eatGoals[f] + "×";
+      const set = n => { state.settings.eatGoals[f] = Math.max(1, Math.min(7, n)); save(); renderEditor(); };
+      li.append(label,
+        mini("Fewer days", "−", () => set(state.settings.eatGoals[f] - 1), state.settings.eatGoals[f] <= 1),
+        val,
+        mini("More days", "+", () => set(state.settings.eatGoals[f] + 1), state.settings.eatGoals[f] >= 7),
+        mini("Remove this change", "🗑", () => { delete state.settings.eatGoals[f]; save(); renderEditor(); }, false, "danger"));
+      el.appendChild(li);
+    });
+
     // laser schedule
     const ll = $("editLaser");
     ll.innerHTML = "";
@@ -1361,6 +1407,14 @@
     item.exercises.push({ id: uid(), name, sets: "", reps: "", weight: "", notes: "" });
     $("exNew").value = "";
     save(); renderWorkoutSheet();
+  });
+  $("eatAdd").addEventListener("click", () => {
+    const v = $("eatNewDate").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { toast("Pick a date first"); return; }
+    const wk = key(startOfWeek(parseKey(v)));
+    if (state.settings.eatGoals[wk] == null) state.settings.eatGoals[wk] = eatGoalFor(parseKey(wk));
+    $("eatNewDate").value = "";
+    save(); renderEditor();
   });
   $("laserAddMonth").addEventListener("click", () => {
     const months = Object.keys(state.settings.laser).sort();

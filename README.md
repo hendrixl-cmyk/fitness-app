@@ -12,6 +12,7 @@ A single-page weekly fitness tracker built for phones. Weeks run Sunday to Satur
 
 ## Edit screen (✏️ Edit, top right)
 - Add, rename, reorder, and delete workouts (☰ opens a workout's exercise list for editing)
+- Change your weekly eating goal (5× the week of Sep 27, 7× Oct 4–24, 6× from Oct 25)
 - Change your weekly workout goal (3× a week, rising to 4× starting the week of Nov 1)
 - Fix or delete weight entries
 - Set reminder times and add them to your calendar
