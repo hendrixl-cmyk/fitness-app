@@ -265,9 +265,11 @@
     transition: transform .28s cubic-bezier(.2,.8,.2,1), visibility 0s linear .28s;
     display: flex; flex-direction: column;
   }
-  body.sheet-open { overflow: hidden; }
-  body.sheet-open .sheet { transform: none; visibility: visible; transition-delay: 0s; }
-  body.sheet-open .sheet-backdrop { opacity: 1; pointer-events: auto; }
+  body.locked { overflow: hidden; }
+  .sheet.open { transform: none; visibility: visible; transition-delay: 0s; }
+  .sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+  #wSheet { z-index: 13; }
+  #wSheet.open ~ .sheet-backdrop, .sheet-backdrop.top { z-index: 12; }
   .sheet-head {
     display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 8px;
   }
@@ -283,6 +285,37 @@
   .mini:disabled { opacity: .35; }
   .mini.danger { color: #e34948; }
   .stepper { display: flex; align-items: center; gap: 12px; }
+  /* ---------- workout detail ---------- */
+  .wlist li.has-detail { cursor: pointer; }
+  .wmeta { display: block; font-size: .78rem; color: var(--muted); text-decoration: none; }
+  .chev { color: var(--muted); font-size: 1.3rem; line-height: 1; padding: 0 2px; }
+  .ex-list { list-style: none; margin: 0; padding: 0; }
+  .ex {
+    display: flex; gap: 14px; align-items: flex-start; width: 100%; text-align: left;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 10px;
+  }
+  .ex:active { transform: scale(.99); }
+  .ex .check { width: 30px; height: 30px; border-radius: 99px; border: 2px solid var(--line); flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 800; color: var(--on-ink); margin-top: 1px; }
+  .ex.done { border-color: var(--good); }
+  .ex.done .check { background: var(--good); border-color: var(--good); color: #fff; }
+  .ex.done .ex-name { color: var(--muted); text-decoration: line-through; }
+  .ex-name { font-weight: 600; font-size: 1.02rem; }
+  .ex-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ex-meta span { font-size: .78rem; font-weight: 600; background: var(--card-2); color: var(--text-2); padding: 3px 8px; border-radius: 99px; }
+  .ex-notes { font-size: .82rem; color: var(--text-2); margin-top: 6px; white-space: pre-wrap; }
+  .ex-edit { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-top: 10px; display: grid; gap: 8px; }
+  .ex-edit .row { display: flex; gap: 6px; align-items: center; }
+  .ex-edit .field { padding: 9px 11px; }
+  .ex-edit .triple { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .ex-edit label { font-size: .7rem; font-weight: 700; color: var(--muted); display: grid; gap: 3px; }
+  .ex-edit .triple .field { width: 100%; }
+  .w-actions { display: grid; gap: 8px; margin-top: 14px; }
+  .w-actions .btn { width: 100%; padding: 14px; }
+  .w-actions .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn.good { background: var(--good); color: #fff; }
+  .cal-links { display: grid; gap: 8px; margin-top: 10px; }
+  .cal-links a { text-decoration: none; text-align: center; }
   .stepper b { font-size: 1.3rem; min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
 
 </style>
@@ -326,7 +359,7 @@
       <h2 id="dayTitle">Today</h2>
       <span class="sub" id="dayDate"></span>
     </div>
-    <div class="banner" id="nightBanner" hidden>🌙 <span>Nightly check-in: tap what you got done today.</span></div>
+    <div class="banner" id="nightBanner" hidden></div>
     <div class="days" id="days"></div>
     <div class="tiles" id="tiles"></div>
   </section>
@@ -368,7 +401,6 @@
 
   <p class="note">Saved automatically on this device · <button class="link-btn" data-edit style="font-size:inherit">Back up</button></p>
 </main>
-<div class="sheet-backdrop" id="sheetBackdrop"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
   <div class="sheet-head">
     <h2 id="sheetTitle">Edit</h2>
@@ -404,15 +436,19 @@
     <section class="card">
     <div class="section-head"><h2>Reminders</h2></div>
     <div class="rem-row">
-      <div><b>💊 Take supplements</b><div class="sub">Every day</div></div>
+      <div><b>💊 Take supplements</b><div class="sub">Repeats every day</div></div>
       <input type="time" id="suppTime" aria-label="Supplement reminder time">
     </div>
     <div class="rem-row">
-      <div><b>🌙 Log your day</b><div class="sub">Every night</div></div>
+      <div><b>🌙 Log your day</b><div class="sub">Repeats every night</div></div>
       <input type="time" id="logTime" aria-label="Nightly log reminder time">
     </div>
-    <button class="btn" id="icsBtn" style="width:100%;margin-top:10px">🔔 Add daily reminders to my calendar</button>
-    <p class="help" style="margin:10px 0 0">Downloads a calendar file. Open it and tap <b>Add All</b>. Your phone will then send both alerts every day, even when this app is closed.</p>
+    <div class="cal-links">
+      <button class="btn" id="icsBtn">🍎 Add to iPhone Calendar (both, daily)</button>
+      <a class="btn secondary" id="gcalSupp" target="_blank" rel="noopener">Google Calendar: 💊 supplements, daily</a>
+      <a class="btn secondary" id="gcalLog" target="_blank" rel="noopener">Google Calendar: 🌙 log your day, daily</a>
+    </div>
+    <p class="help" style="margin:10px 0 0">You only have to add these <b>once</b>. They're set to <b>repeat every day</b> with an alert, so your phone reminds you daily even when the app is closed. On iPhone, tap <b>Add All</b> when the calendar opens. If you change a time, delete the old event from your calendar and add the reminder again.</p>
     </section>
 
     <!-- Step sync -->
@@ -442,6 +478,28 @@
     </section>
   </div>
 </div>
+<div class="sheet" id="wSheet" role="dialog" aria-modal="true" aria-labelledby="wTitle">
+  <div class="sheet-head">
+    <div style="min-width:0"><h2 id="wTitle"></h2><div class="sub" id="wSub"></div></div>
+    <button class="btn" id="wClose">Done</button>
+  </div>
+  <div class="sheet-body">
+    <div class="meter" style="height:8px;margin:4px 2px 0"><div id="wBar" style="background:var(--good)"></div></div>
+    <ul class="ex-list" id="exList"></ul>
+    <form class="add-row" id="exAddForm" hidden>
+      <input class="field" id="exNew" placeholder="Add an exercise (e.g. Bench press)" maxlength="60" autocomplete="off">
+      <button class="btn" type="submit">Add</button>
+    </form>
+    <div class="w-actions">
+      <button class="btn good" id="wFinish"></button>
+      <div class="pair">
+        <button class="btn secondary" id="wEditToggle">✏️ Edit exercises</button>
+        <button class="btn secondary" id="wReset">↺ Reset checks</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -450,8 +508,8 @@
 
   const STORAGE_KEY = "fitness-tracker-v1";
   const STEP_GOAL = 10000;
-  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const HABITS = [
     { id: "eat",   label: "Ate right",   icon: "🥗", color: "var(--diet)",  hint: "Stuck to the plan today" },
     { id: "supp",  label: "Supplements", icon: "💊", color: "var(--supp)",  hint: "Took everything today" },
@@ -476,11 +534,47 @@
 
   function normalize(data) {
     if (!data || !Array.isArray(data.plan) || typeof data.weeks !== "object") {
-      data = { plan: DEFAULT_PLAN.map(name => ({ id: uid(), name })), weeks: {} };
+      data = { plan: DEFAULT_PLAN.map(name => ({ id: uid(), name })), weeks: {}, weekStart: "sun" };
     }
     data.weights = data.weights || {};
+    if (data.weekStart !== "sun") migrateToSundayWeeks(data);
+    data.plan.forEach(p => { if (!Array.isArray(p.exercises)) p.exercises = []; });
     data.settings = Object.assign({ suppTime: "09:00", logTime: "21:30", goal: 3 }, data.settings || {});
     return data;
+  }
+
+  // Older data used Monday-start weeks. Re-bucket every day into Sunday-start weeks.
+  function migrateToSundayWeeks(data) {
+    const out = {};
+    const bucket = d => {
+      const k = key(startOfWeek(d));
+      if (!out[k]) {
+        out[k] = { workouts: {}, habits: {}, stepCounts: [null, null, null, null, null, null, null] };
+        HABITS.forEach(h => { out[k].habits[h.id] = [false, false, false, false, false, false, false]; });
+      }
+      return out[k];
+    };
+    Object.keys(data.weeks || {}).forEach(k => {
+      const w = data.weeks[k] || {};
+      const monday = parseKey(k);
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(monday, i);
+        const t = bucket(d);
+        HABITS.forEach(h => { if (w.habits && w.habits[h.id] && w.habits[h.id][i]) t.habits[h.id][d.getDay()] = true; });
+        if (w.stepCounts && w.stepCounts[i] != null) t.stepCounts[d.getDay()] = w.stepCounts[i];
+      }
+      Object.keys(w.workouts || {}).forEach(id => {
+        const e = w.workouts[id];
+        if (!e || !e.done) return;
+        const d = addDays(monday, e.day || 0);
+        bucket(d).workouts[id] = { done: true, day: d.getDay() };
+      });
+    });
+    const weights = {};
+    Object.keys(data.weights || {}).forEach(k => { weights[key(addDays(parseKey(k), -1))] = data.weights[k]; });
+    data.weeks = out;
+    data.weights = weights;
+    data.weekStart = "sun";
   }
 
   function save() {
@@ -488,11 +582,12 @@
   }
 
   let state = load();
+  save(); // persist any one-time data migration
 
   // ---------- dates ----------
   function startOfWeek(d) {
     const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    x.setDate(x.getDate() - (x.getDay() + 6) % 7); // Monday start
+    x.setDate(x.getDate() - x.getDay()); // Sunday start
     return x;
   }
   function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
@@ -501,10 +596,10 @@
   }
   function parseKey(k) { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); }
   function fmt(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
-  function dayIndex(d) { return (d.getDay() + 6) % 7; }
+  function dayIndex(d) { return d.getDay(); }
 
-  const now = new Date();
-  const thisWeek = startOfWeek(now);
+  let now = new Date();
+  let thisWeek = startOfWeek(now);
   let currentWeek = thisWeek;
   let selectedDay = dayIndex(now);
 
@@ -518,6 +613,7 @@
       if (!Array.isArray(w.habits[h.id])) w.habits[h.id] = [false, false, false, false, false, false, false];
     });
     if (!Array.isArray(w.stepCounts)) w.stepCounts = [null, null, null, null, null, null, null];
+    w.progress = w.progress || {};
     return w;
   }
 
@@ -609,7 +705,16 @@
     $("dayDate").textContent = fmt(dayDate);
 
     const allDone = HABITS.every(hb => week.habits[hb.id][todayIdx]);
-    $("nightBanner").hidden = !(todayIdx >= 0 && selectedDay === todayIdx && now.getHours() >= 18 && !allDone);
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const toMins = t => { const [a, b] = t.split(":").map(Number); return a * 60 + b; };
+    const banner = $("nightBanner");
+    let msg = "";
+    if (todayIdx >= 0 && selectedDay === todayIdx) {
+      if (mins >= Math.min(toMins(state.settings.logTime), 18 * 60) && !allDone) msg = "🌙 Nightly check-in: tap what you got done today.";
+      else if (mins >= toMins(state.settings.suppTime) && !week.habits.supp[todayIdx]) msg = "💊 Time to take your supplements. Tap below when done.";
+    }
+    banner.textContent = msg;
+    banner.hidden = !msg;
 
     const days = $("days");
     days.innerHTML = "";
@@ -652,7 +757,7 @@
   function renderWorkouts(week) {
     const list = $("workoutList");
     list.innerHTML = "";
-    $("workoutSub").textContent = "Tap to log on " + DAYS[selectedDay];
+    $("workoutSub").textContent = "Tap a workout to see your exercises";
     if (state.plan.length === 0) {
       list.innerHTML = '<li><span class="wname sub">No workouts yet. Tap Edit list to add some.</span></li>';
     }
@@ -671,15 +776,19 @@
       const name = document.createElement("span");
       name.className = "wname";
       name.textContent = item.name;
+      const n = item.exercises.length;
+      const doneEx = (week.progress[item.id] || []).filter(id => item.exercises.some(e => e.id === id)).length;
+      const meta = document.createElement("span");
+      meta.className = "wmeta";
+      meta.textContent = n ? (doneEx && !done ? doneEx + "/" + n + " exercises done" : n + " exercise" + (n === 1 ? "" : "s")) : "Tap to add exercises";
+      name.appendChild(meta);
 
-      const toggle = () => {
-        if (done) delete week.workouts[item.id];
-        else week.workouts[item.id] = { done: true, day: selectedDay };
-        save(); render();
-        if (!done && workoutCount(week) === goal()) toast("🏆 " + goal() + " workouts this week. Goal hit!");
-      };
-      cb.addEventListener("click", toggle);
-      name.addEventListener("click", toggle);
+      cb.addEventListener("click", e => {
+        e.stopPropagation();
+        setWorkoutDone(week, item.id, !done);
+      });
+      li.classList.add("has-detail");
+      li.addEventListener("click", () => openWorkout(item.id));
 
       li.append(cb, name);
       if (done) {
@@ -688,9 +797,131 @@
         tag.textContent = DAYS[entry.day] || "";
         li.appendChild(tag);
       }
+      const chev = document.createElement("span");
+      chev.className = "chev";
+      chev.textContent = "›";
+      li.appendChild(chev);
 
       list.appendChild(li);
     });
+  }
+
+  function setWorkoutDone(week, id, done) {
+    if (done) week.workouts[id] = { done: true, day: selectedDay };
+    else delete week.workouts[id];
+    save(); render();
+    if (done && workoutCount(week) === goal()) toast("🏆 " + goal() + " workouts this week. Goal hit!");
+    else if (done) toast("💪 Workout logged for " + DAY_NAMES[selectedDay]);
+  }
+
+  // ---------- workout detail (exercise checklist) ----------
+  let openWorkoutId = null;
+  let editingExercises = false;
+
+  function openWorkout(id, edit) {
+    openWorkoutId = id;
+    const item = state.plan.find(p => p.id === id);
+    editingExercises = !!edit || !(item && item.exercises.length);
+    renderWorkoutSheet();
+    openSheet("wSheet");
+  }
+
+  function renderWorkoutSheet() {
+    const item = state.plan.find(p => p.id === openWorkoutId);
+    if (!item) { closeSheet("wSheet"); return; }
+    const week = getWeek(key(currentWeek), true);
+    const checked = week.progress[item.id] = (week.progress[item.id] || []).filter(id => item.exercises.some(e => e.id === id));
+    const entry = week.workouts[item.id];
+    const logged = !!(entry && entry.done);
+    const n = item.exercises.length;
+
+    $("wTitle").textContent = item.name;
+    $("wSub").textContent = n ? checked.length + " of " + n + " done" + (logged ? " · logged " + DAYS[entry.day] : "") : "No exercises yet";
+    $("wBar").style.width = (n ? checked.length / n * 100 : 0) + "%";
+
+    const list = $("exList");
+    list.innerHTML = "";
+    if (!n && !editingExercises) list.innerHTML = '<li class="empty">No exercises yet.</li>';
+
+    item.exercises.forEach((ex, i) => {
+      const li = document.createElement("li");
+      if (!editingExercises) {
+        const on = checked.includes(ex.id);
+        const b = document.createElement("button");
+        b.className = "ex" + (on ? " done" : "");
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        const chips = [];
+        if (ex.sets || ex.reps) chips.push((ex.sets ? ex.sets + " sets" : "") + (ex.sets && ex.reps ? " × " : "") + (ex.reps ? ex.reps + " reps" : ""));
+        if (ex.weight) chips.push(ex.weight);
+        b.innerHTML = '<span class="check">' + (on ? "✓" : "") + '</span><span style="flex:1;min-width:0"><div class="ex-name"></div>' +
+          (chips.length ? '<div class="ex-meta">' + chips.map(() => "<span></span>").join("") + "</div>" : "") +
+          (ex.notes ? '<div class="ex-notes"></div>' : "") + "</span>";
+        b.querySelector(".ex-name").textContent = ex.name;
+        b.querySelectorAll(".ex-meta span").forEach((s, j) => { s.textContent = chips[j]; });
+        if (ex.notes) b.querySelector(".ex-notes").textContent = ex.notes;
+        b.addEventListener("click", () => {
+          const idx = checked.indexOf(ex.id);
+          if (idx >= 0) checked.splice(idx, 1); else checked.push(ex.id);
+          save(); renderWorkoutSheet();
+          if (checked.length === n && idx < 0) toast("🔥 All exercises done! Tap Finish workout.");
+        });
+        li.appendChild(b);
+      } else {
+        const box = document.createElement("div");
+        box.className = "ex-edit";
+        const field = (prop, label, ph, cls) => {
+          const inp = document.createElement("input");
+          inp.className = "field" + (cls ? " " + cls : "");
+          inp.value = ex[prop] || "";
+          inp.placeholder = ph;
+          inp.maxLength = prop === "notes" ? 140 : 40;
+          inp.setAttribute("aria-label", label);
+          inp.addEventListener("change", () => {
+            const v = inp.value.trim();
+            if (prop === "name" && !v) { inp.value = ex.name; return; }
+            ex[prop] = v; save();
+          });
+          return inp;
+        };
+        const row = document.createElement("div");
+        row.className = "row";
+        const nm = field("name", "Exercise name", "Exercise");
+        nm.style.flex = "1"; nm.style.fontWeight = "600";
+        const move = dir => {
+          const j = i + dir;
+          [item.exercises[i], item.exercises[j]] = [item.exercises[j], item.exercises[i]];
+          save(); renderWorkoutSheet();
+        };
+        row.append(nm,
+          mini("Move up", "↑", () => move(-1), i === 0),
+          mini("Move down", "↓", () => move(1), i === n - 1),
+          mini("Delete " + ex.name, "🗑", () => {
+            if (!confirm('Delete "' + ex.name + '"?')) return;
+            item.exercises.splice(i, 1);
+            save(); renderWorkoutSheet();
+          }, false, "danger"));
+        const triple = document.createElement("div");
+        triple.className = "triple";
+        [["sets", "SETS", "3"], ["reps", "REPS", "8–12"], ["weight", "WEIGHT", "135 lbs"]].forEach(([p, l, ph]) => {
+          const lab = document.createElement("label");
+          lab.textContent = l;
+          lab.appendChild(field(p, l.toLowerCase(), ph));
+          triple.appendChild(lab);
+        });
+        box.append(row, triple, field("notes", "Notes", "Notes (optional): tempo, rest, cues…"));
+        li.appendChild(box);
+      }
+      list.appendChild(li);
+    });
+
+    $("exAddForm").hidden = !editingExercises;
+    $("wEditToggle").textContent = editingExercises ? "✓ Done editing" : "✏️ Edit exercises";
+    $("wReset").disabled = !checked.length;
+    $("wFinish").textContent = logged
+      ? "✓ Logged for " + DAY_NAMES[entry.day] + " (tap to undo)"
+      : "✓ Finish workout · log for " + (currentWeek.getTime() === thisWeek.getTime() && selectedDay === dayIndex(now) ? "today" : DAY_NAMES[selectedDay]);
+    $("wFinish").classList.toggle("secondary", logged);
+    $("wFinish").classList.toggle("good", !logged);
   }
 
   // ---------- weight ----------
@@ -804,13 +1035,14 @@
     const hist = $("history");
     hist.innerHTML = "";
     for (let i = 8; i >= 1; i--) {
-      const d = addDays(currentWeek, -7 * i);
+      const d = addDays(thisWeek, -7 * i);
       const n = workoutCount(getWeek(key(d), false));
       const b = document.createElement("button");
       b.className = "hweek" + (n >= goal() ? " hit" : "");
+      if (key(d) === key(currentWeek)) b.style.outline = "2px solid var(--text-2)";
       b.innerHTML = "<small>" + fmt(d) + "</small><b>" + n + "</b>";
       b.setAttribute("aria-label", "Week of " + fmt(d) + ": " + n + " workouts");
-      b.addEventListener("click", () => { currentWeek = d; window.scrollTo({ top: 0, behavior: "smooth" }); render(); });
+      b.addEventListener("click", () => { currentWeek = d; selectedDay = 0; window.scrollTo({ top: 0, behavior: "smooth" }); render(); });
       hist.appendChild(b);
     }
   }
@@ -849,9 +1081,43 @@
     ].join("\r\n");
   }
 
-  // ---------- edit sheet ----------
-  function openEditor() { renderEditor(); document.body.classList.add("sheet-open"); }
-  function closeEditor() { document.body.classList.remove("sheet-open"); render(); }
+  function gcalLink(title, time, desc) {
+    const start = icsTime(now, time);
+    const [hh, mm] = time.split(":").map(Number);
+    const endD = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm + 5);
+    const end = key(endD).replace(/-/g, "") + "T" + String(endD.getHours()).padStart(2, "0") + String(endD.getMinutes()).padStart(2, "0") + "00";
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "";
+    return "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+      "&text=" + encodeURIComponent(title) +
+      "&details=" + encodeURIComponent(desc) +
+      "&dates=" + start + "/" + end +
+      "&recur=" + encodeURIComponent("RRULE:FREQ=DAILY") +
+      (tz ? "&ctz=" + encodeURIComponent(tz) : "");
+  }
+  function updateReminderLinks() {
+    $("gcalSupp").href = gcalLink("💊 Take your supplements", state.settings.suppTime, "Take your supplements, then check them off in your tracker.");
+    $("gcalLog").href = gcalLink("🌙 Log your day", state.settings.logTime, "Check off eating, supplements, 10K steps and any workout.");
+  }
+
+  // ---------- sheets ----------
+  function openSheet(id) {
+    $(id).classList.add("open");
+    $("sheetBackdrop").classList.add("show");
+    document.body.classList.add("locked");
+  }
+  function closeSheet(id) {
+    $(id).classList.remove("open");
+    if (!document.querySelector(".sheet.open")) {
+      $("sheetBackdrop").classList.remove("show");
+      document.body.classList.remove("locked");
+    }
+    render();
+  }
+  function topSheet() {
+    return $("wSheet").classList.contains("open") ? "wSheet" : $("sheet").classList.contains("open") ? "sheet" : null;
+  }
+  function openEditor() { renderEditor(); updateReminderLinks(); openSheet("sheet"); }
+  function closeEditor() { closeSheet("sheet"); }
 
   function mini(label, text, onClick, disabled, cls) {
     const b = document.createElement("button");
@@ -887,6 +1153,7 @@
       };
       li.append(
         input,
+        mini("Edit exercises for " + item.name, "☰", () => openWorkout(item.id, true)),
         mini("Move up", "↑", () => move(-1), i === 0),
         mini("Move down", "↓", () => move(1), i === state.plan.length - 1),
         mini("Delete " + item.name, "🗑", () => {
@@ -935,8 +1202,31 @@
   $("openEdit").addEventListener("click", openEditor);
   document.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", openEditor));
   $("closeEdit").addEventListener("click", closeEditor);
-  $("sheetBackdrop").addEventListener("click", closeEditor);
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("sheet-open")) closeEditor(); });
+  $("sheetBackdrop").addEventListener("click", () => { const t = topSheet(); if (t) closeSheet(t); });
+  document.addEventListener("keydown", e => { const t = topSheet(); if (e.key === "Escape" && t) closeSheet(t); });
+
+  $("wClose").addEventListener("click", () => { closeSheet("wSheet"); if ($("sheet").classList.contains("open")) renderEditor(); });
+  $("wEditToggle").addEventListener("click", () => { editingExercises = !editingExercises; renderWorkoutSheet(); });
+  $("wReset").addEventListener("click", () => {
+    const week = getWeek(key(currentWeek), true);
+    week.progress[openWorkoutId] = [];
+    save(); renderWorkoutSheet();
+  });
+  $("wFinish").addEventListener("click", () => {
+    const week = getWeek(key(currentWeek), true);
+    const e = week.workouts[openWorkoutId];
+    setWorkoutDone(week, openWorkoutId, !(e && e.done));
+    renderWorkoutSheet();
+  });
+  $("exAddForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const item = state.plan.find(p => p.id === openWorkoutId);
+    const name = $("exNew").value.trim();
+    if (!item || !name) return;
+    item.exercises.push({ id: uid(), name, sets: "", reps: "", weight: "", notes: "" });
+    $("exNew").value = "";
+    save(); renderWorkoutSheet();
+  });
   $("goalMinus").addEventListener("click", () => { state.settings.goal = Math.max(1, goal() - 1); save(); renderEditor(); });
   $("goalPlus").addEventListener("click", () => { state.settings.goal = Math.min(7, goal() + 1); save(); renderEditor(); });
 
@@ -950,7 +1240,7 @@
     const input = $("newWorkout");
     const name = input.value.trim();
     if (!name) return;
-    state.plan.push({ id: uid(), name });
+    state.plan.push({ id: uid(), name, exercises: [] });
     input.value = "";
     save(); renderEditor();
   });
@@ -975,10 +1265,12 @@
 
   ["suppTime", "logTime"].forEach(id => {
     $(id).value = state.settings[id];
-    $(id).addEventListener("change", () => { state.settings[id] = $(id).value || state.settings[id]; save(); });
+    $(id).addEventListener("change", () => { state.settings[id] = $(id).value || state.settings[id]; save(); updateReminderLinks(); });
   });
 
   $("icsBtn").addEventListener("click", () => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isIOS) { location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(buildIcs()); return; }
     const blob = new Blob([buildIcs()], { type: "text/calendar" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1018,6 +1310,21 @@
   window.addEventListener("resize", () => {
     if (window.innerWidth !== lastW) { lastW = window.innerWidth; renderWeight(key(currentWeek)); }
   });
+
+  function refreshToday() {
+    const fresh = new Date();
+    const dayChanged = key(fresh) !== key(now);
+    now = fresh;
+    if (dayChanged) {
+      thisWeek = startOfWeek(now);
+      currentWeek = thisWeek;
+      selectedDay = dayIndex(now);
+    }
+    render();
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshToday(); });
+  window.addEventListener("focus", refreshToday);
+  setInterval(refreshToday, 60 * 1000);
 
   syncStepsFromUrl();
   render();
