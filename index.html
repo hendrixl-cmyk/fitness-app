@@ -29,6 +29,7 @@
     --supp: #2a78d6;
     --steps: #eb6834;
     --diet: #1baf7a;
+    --laser: #4a3aa7;
     --weight: #2a78d6;
     --good: #0f8a4f;
     --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
@@ -48,6 +49,7 @@
       --supp: #3987e5;
       --steps: #d95926;
       --diet: #199e70;
+      --laser: #9085e9;
       --weight: #3987e5;
       --good: #34c77b;
       --shadow: none;
@@ -316,6 +318,10 @@
   .btn.good { background: var(--good); color: #fff; }
   .cal-links { display: grid; gap: 8px; margin-top: 10px; }
   .cal-links a { text-decoration: none; text-align: center; }
+  .laser-note { margin-top: 10px; font-size: .85rem; color: var(--text-2); background: var(--card-2); border-radius: 12px; padding: 10px 12px; }
+  .laser-dots { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+  .laser-dots i { width: 8px; height: 8px; border-radius: 99px; border: 1.5px solid var(--laser); }
+  .laser-dots i.on { background: var(--laser); }
   .stepper b { font-size: 1.3rem; min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
 
 </style>
@@ -362,6 +368,7 @@
     <div class="banner" id="nightBanner" hidden></div>
     <div class="days" id="days"></div>
     <div class="tiles" id="tiles"></div>
+    <div class="laser-note" id="laserNote" hidden></div>
   </section>
 
   <!-- Workouts -->
@@ -425,6 +432,13 @@
           <button class="mini" id="goalPlus" aria-label="Raise goal">+</button>
         </div>
       </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><div><h2>⚡ Laser schedule</h2><div class="sub">Sessions per week, by month</div></div></div>
+      <ul class="edit-list" id="editLaser"></ul>
+      <button class="btn secondary" id="laserAddMonth" style="width:100%;margin-top:8px">+ Add a month</button>
+      <p class="help" style="margin:8px 0 0">A week counts toward the month that most of its days fall in.</p>
     </section>
 
     <section class="card">
@@ -540,6 +554,7 @@
     if (data.weekStart !== "sun") migrateToSundayWeeks(data);
     data.plan.forEach(p => { if (!Array.isArray(p.exercises)) p.exercises = []; });
     data.settings = Object.assign({ suppTime: "09:00", logTime: "21:30", goal: 3 }, data.settings || {});
+    if (!data.settings.laser) data.settings.laser = { "2026-10": 3, "2026-11": 2, "2026-12": 1 };
     return data;
   }
 
@@ -614,7 +629,19 @@
     });
     if (!Array.isArray(w.stepCounts)) w.stepCounts = [null, null, null, null, null, null, null];
     w.progress = w.progress || {};
+    if (!Array.isArray(w.laser)) w.laser = [false, false, false, false, false, false, false];
     return w;
+  }
+
+  // ---------- laser (weekly target that changes by month) ----------
+  const monthKey = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  const monthName = mk => { const [y, m] = mk.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }); };
+  // A Sunday–Saturday week belongs to the month holding most of its days (its Wednesday).
+  const weekMonth = ws => monthKey(addDays(ws, 3));
+  function laserGoal(ws) { return state.settings.laser[weekMonth(ws)] || 0; }
+  function nextLaserMonth(ws) {
+    const cur = weekMonth(ws);
+    return Object.keys(state.settings.laser).sort().find(mk => mk > cur && state.settings.laser[mk] > 0) || null;
   }
 
   function workoutCount(w) {
@@ -692,6 +719,14 @@
         '<div class="meter"><div style="width:' + (n / 7 * 100) + "%;background:" + hb.color + '"></div></div>';
       stats.appendChild(row);
     });
+    const lg = laserGoal(currentWeek);
+    if (lg) {
+      const n = week.laser.filter(Boolean).length;
+      const row = document.createElement("div");
+      row.innerHTML = '<div class="stat-top"><b>⚡ Laser</b><span>' + n + "/" + lg + "</span></div>" +
+        '<div class="meter"><div style="width:' + Math.min(100, n / lg * 100) + '%;background:var(--laser)"></div></div>';
+      stats.appendChild(row);
+    }
 
     const left = goal() - count;
     $("goalMsg").textContent = count >= goal()
@@ -727,7 +762,7 @@
       b.innerHTML = '<span class="dow">' + d.slice(0, 1) + '</span><span class="date">' + addDays(currentWeek, i).getDate() +
         '</span><span class="dots">' + HABITS.map((hb, j) =>
           '<i class="' + (done[j] ? "on" : "") + '"' + (done[j] ? ' style="background:' + hb.color + '"' : "") + "></i>").join("") +
-        "</span>";
+        (week.laser[i] ? '<i class="on" style="background:var(--laser)"></i>' : "") + "</span>";
       b.addEventListener("click", () => { selectedDay = i; render(); });
       days.appendChild(b);
     });
@@ -752,6 +787,34 @@
       });
       tiles.appendChild(b);
     });
+
+    const lg = laserGoal(currentWeek);
+    const note = $("laserNote");
+    note.hidden = true;
+    if (lg) {
+      const on = week.laser[selectedDay];
+      const n = week.laser.filter(Boolean).length;
+      const b = document.createElement("button");
+      b.className = "tile" + (on ? " on" : "");
+      b.style.setProperty("--c", "var(--laser)");
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.innerHTML = '<span class="icon">⚡</span><span class="txt"><div class="title">Laser</div><div class="hint">' +
+        (on ? "Done ✓ · " : "") + n + " of " + lg + " this week" +
+        '<span class="laser-dots">' + Array.from({ length: Math.max(lg, n) }, (_, k) => '<i class="' + (k < n ? "on" : "") + '"></i>').join("") +
+        '</span></div></span><span class="check">' + (on ? "✓" : "") + "</span>";
+      b.addEventListener("click", () => {
+        week.laser[selectedDay] = !on;
+        save(); render();
+        if (!on && week.laser.filter(Boolean).length === lg) toast("⚡ Laser done " + lg + "× this week!");
+      });
+      tiles.appendChild(b);
+    } else {
+      const nm = nextLaserMonth(currentWeek);
+      if (nm) {
+        note.textContent = "⚡ Laser starts in " + monthName(nm) + ": " + state.settings.laser[nm] + "× a week.";
+        note.hidden = false;
+      }
+    }
   }
 
   function renderWorkouts(week) {
@@ -1170,6 +1233,28 @@
     $("goalMinus").disabled = goal() <= 1;
     $("goalPlus").disabled = goal() >= 7;
 
+    // laser schedule
+    const ll = $("editLaser");
+    ll.innerHTML = "";
+    const months = Object.keys(state.settings.laser).sort();
+    if (!months.length) ll.innerHTML = '<li class="sub">No months scheduled.</li>';
+    months.forEach(mk => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "when";
+      label.textContent = monthName(mk);
+      const val = document.createElement("b");
+      val.style.minWidth = "44px"; val.style.textAlign = "center";
+      val.textContent = state.settings.laser[mk] + "×";
+      const set = n => { state.settings.laser[mk] = Math.max(0, Math.min(7, n)); save(); renderEditor(); };
+      li.append(label,
+        mini("Fewer sessions in " + monthName(mk), "−", () => set(state.settings.laser[mk] - 1), state.settings.laser[mk] <= 0),
+        val,
+        mini("More sessions in " + monthName(mk), "+", () => set(state.settings.laser[mk] + 1), state.settings.laser[mk] >= 7),
+        mini("Remove " + monthName(mk), "🗑", () => { delete state.settings.laser[mk]; save(); renderEditor(); }, false, "danger"));
+      ll.appendChild(li);
+    });
+
     // weights: edit / delete
     const wl = $("editWeights");
     wl.innerHTML = "";
@@ -1226,6 +1311,14 @@
     item.exercises.push({ id: uid(), name, sets: "", reps: "", weight: "", notes: "" });
     $("exNew").value = "";
     save(); renderWorkoutSheet();
+  });
+  $("laserAddMonth").addEventListener("click", () => {
+    const months = Object.keys(state.settings.laser).sort();
+    let d;
+    if (months.length) { const [y, m] = months[months.length - 1].split("-").map(Number); d = new Date(y, m, 1); }
+    else d = new Date(now.getFullYear(), now.getMonth(), 1);
+    state.settings.laser[monthKey(d)] = 1;
+    save(); renderEditor();
   });
   $("goalMinus").addEventListener("click", () => { state.settings.goal = Math.max(1, goal() - 1); save(); renderEditor(); });
   $("goalPlus").addEventListener("click", () => { state.settings.goal = Math.min(7, goal() + 1); save(); renderEditor(); });
