@@ -425,13 +425,14 @@
 
     <section class="card">
       <div class="section-head">
-        <div><h2>🎯 Weekly workout goal</h2><div class="sub">Minimum workouts per week</div></div>
+        <div><h2>🎯 Weekly workout goal</h2><div class="sub" id="goalBaseLabel">Minimum workouts per week</div></div>
         <div class="stepper">
           <button class="mini" id="goalMinus" aria-label="Lower goal">−</button>
           <b id="goalVal">3</b>
           <button class="mini" id="goalPlus" aria-label="Raise goal">+</button>
         </div>
       </div>
+      <ul class="edit-list" id="editGoalChanges"></ul>
     </section>
 
     <section class="card">
@@ -532,7 +533,13 @@
   const DEFAULT_PLAN = ["Upper body", "Lower body", "Full body / Cardio"];
 
   const $ = id => document.getElementById(id);
-  const goal = () => state.settings.goal;
+  const goal = () => state.settings.goal; // base goal (before any scheduled change)
+  // Workout goal for a given week: the latest scheduled change starting on/before it, else the base goal.
+  function goalFor(ws) {
+    const k = key(ws);
+    const from = Object.keys(state.settings.goalChanges).sort().filter(f => f <= k).pop();
+    return from ? state.settings.goalChanges[from] : goal();
+  }
 
   // ---------- storage ----------
   function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -555,6 +562,9 @@
     data.plan.forEach(p => { if (!Array.isArray(p.exercises)) p.exercises = []; });
     data.settings = Object.assign({ suppTime: "09:00", logTime: "21:30", goal: 3 }, data.settings || {});
     if (!data.settings.laser) data.settings.laser = { "2026-10": 3, "2026-11": 2, "2026-12": 1 };
+    // Per-week exceptions to the month schedule, keyed by week start (Sunday).
+    if (!data.settings.goalChanges) data.settings.goalChanges = { "2026-11-01": 4 };
+    if (!data.settings.laserWeeks) data.settings.laserWeeks = { "2026-09-27": 3 };
     return data;
   }
 
@@ -638,7 +648,10 @@
   const monthName = mk => { const [y, m] = mk.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" }); };
   // A Sunday–Saturday week belongs to the month holding most of its days (its Wednesday).
   const weekMonth = ws => monthKey(addDays(ws, 3));
-  function laserGoal(ws) { return state.settings.laser[weekMonth(ws)] || 0; }
+  function laserGoal(ws) {
+    const o = state.settings.laserWeeks[key(ws)];
+    return o != null ? o : (state.settings.laser[weekMonth(ws)] || 0);
+  }
   function nextLaserMonth(ws) {
     const cur = weekMonth(ws);
     return Object.keys(state.settings.laser).sort().find(mk => mk > cur && state.settings.laser[mk] > 0) || null;
@@ -705,10 +718,11 @@
   function renderSummary(week) {
     const count = workoutCount(week);
     const circ = 2 * Math.PI * 42;
-    $("ringFill").style.strokeDashoffset = circ * (1 - Math.min(1, count / goal()));
-    $("ring").classList.toggle("hit", count >= goal());
+    const wg = goalFor(currentWeek);
+    $("ringFill").style.strokeDashoffset = circ * (1 - Math.min(1, count / wg));
+    $("ring").classList.toggle("hit", count >= wg);
     $("workoutCount").textContent = count;
-    $("ringOf").textContent = "of " + goal() + " workouts";
+    $("ringOf").textContent = "of " + wg + " workouts";
 
     const stats = $("stats");
     stats.innerHTML = "";
@@ -728,9 +742,9 @@
       stats.appendChild(row);
     }
 
-    const left = goal() - count;
-    $("goalMsg").textContent = count >= goal()
-      ? (count > goal() ? "🔥 " + count + " workouts. Above your goal this week." : "✅ Weekly workout goal hit. Nice work.")
+    const left = wg - count;
+    $("goalMsg").textContent = count >= wg
+      ? (count > wg ? "🔥 " + count + " workouts. Above your goal this week." : "✅ Weekly workout goal hit. Nice work.")
       : "💪 " + left + " more workout" + (left === 1 ? "" : "s") + " to hit your weekly goal.";
   }
 
@@ -873,7 +887,7 @@
     if (done) week.workouts[id] = { done: true, day: selectedDay };
     else delete week.workouts[id];
     save(); render();
-    if (done && workoutCount(week) === goal()) toast("🏆 " + goal() + " workouts this week. Goal hit!");
+    if (done && workoutCount(week) === goalFor(currentWeek)) toast("🏆 " + goalFor(currentWeek) + " workouts this week. Goal hit!");
     else if (done) toast("💪 Workout logged for " + DAY_NAMES[selectedDay]);
   }
 
@@ -1101,7 +1115,7 @@
       const d = addDays(thisWeek, -7 * i);
       const n = workoutCount(getWeek(key(d), false));
       const b = document.createElement("button");
-      b.className = "hweek" + (n >= goal() ? " hit" : "");
+      b.className = "hweek" + (n >= goalFor(d) ? " hit" : "");
       if (key(d) === key(currentWeek)) b.style.outline = "2px solid var(--text-2)";
       b.innerHTML = "<small>" + fmt(d) + "</small><b>" + n + "</b>";
       b.setAttribute("aria-label", "Week of " + fmt(d) + ": " + n + " workouts");
@@ -1232,6 +1246,26 @@
     $("goalVal").textContent = goal();
     $("goalMinus").disabled = goal() <= 1;
     $("goalPlus").disabled = goal() >= 7;
+    const changes = Object.keys(state.settings.goalChanges).sort();
+    $("goalBaseLabel").textContent = changes.length ? "Until the week of " + fmt(parseKey(changes[0])) : "Minimum workouts per week";
+    const gl = $("editGoalChanges");
+    gl.innerHTML = "";
+    changes.forEach(f => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "when";
+      label.textContent = "Starting week of " + fmt(parseKey(f));
+      const val = document.createElement("b");
+      val.style.minWidth = "44px"; val.style.textAlign = "center";
+      val.textContent = state.settings.goalChanges[f] + "×";
+      const set = n => { state.settings.goalChanges[f] = Math.max(1, Math.min(7, n)); save(); renderEditor(); };
+      li.append(label,
+        mini("Lower goal", "−", () => set(state.settings.goalChanges[f] - 1), state.settings.goalChanges[f] <= 1),
+        val,
+        mini("Raise goal", "+", () => set(state.settings.goalChanges[f] + 1), state.settings.goalChanges[f] >= 7),
+        mini("Remove goal change", "🗑", () => { delete state.settings.goalChanges[f]; save(); renderEditor(); }, false, "danger"));
+      gl.appendChild(li);
+    });
 
     // laser schedule
     const ll = $("editLaser");
@@ -1252,6 +1286,22 @@
         val,
         mini("More sessions in " + monthName(mk), "+", () => set(state.settings.laser[mk] + 1), state.settings.laser[mk] >= 7),
         mini("Remove " + monthName(mk), "🗑", () => { delete state.settings.laser[mk]; save(); renderEditor(); }, false, "danger"));
+      ll.appendChild(li);
+    });
+    Object.keys(state.settings.laserWeeks).sort().forEach(wk => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "when";
+      label.textContent = "Week of " + fmt(parseKey(wk)) + " (special)";
+      const val = document.createElement("b");
+      val.style.minWidth = "44px"; val.style.textAlign = "center";
+      val.textContent = state.settings.laserWeeks[wk] + "×";
+      const set = n => { state.settings.laserWeeks[wk] = Math.max(0, Math.min(7, n)); save(); renderEditor(); };
+      li.append(label,
+        mini("Fewer sessions that week", "−", () => set(state.settings.laserWeeks[wk] - 1), state.settings.laserWeeks[wk] <= 0),
+        val,
+        mini("More sessions that week", "+", () => set(state.settings.laserWeeks[wk] + 1), state.settings.laserWeeks[wk] >= 7),
+        mini("Remove special week", "🗑", () => { delete state.settings.laserWeeks[wk]; save(); renderEditor(); }, false, "danger"));
       ll.appendChild(li);
     });
 

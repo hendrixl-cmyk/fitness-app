@@ -5,14 +5,14 @@ A single-page weekly fitness tracker built for phones. Weeks run Sunday to Satur
 ## What's on the main screen
 - **Weekly summary**: a workout ring toward your weekly goal (3 by default), plus progress bars for eating, supplements, and steps
 - **Today**: tap a day, then tap the big tiles to check off *Ate right*, *Supplements*, and *10K steps*. Dots under each day show what you hit, and a green outline means all three were done that day
-- **Laser**: in weeks with laser scheduled, a ⚡ Laser tile appears in the daily check-in and a meter appears in the weekly summary. The target is 3× a week in October, 2× in November, and 1× in December. A week counts toward the month most of its days fall in. Change the schedule in Edit → Laser schedule
+- **Laser**: in weeks with laser scheduled, a ⚡ Laser tile appears in the daily check-in and a meter appears in the weekly summary. The target is 3× a week in October (including the week of Sep 27), 2× in November, and 1× in December. A week counts toward the month most of its days fall in. Change the schedule in Edit → Laser schedule
 - **Workouts**: tap the box to log a workout on the selected day. Tap the workout name to open its exercise list (sets, reps, weight, notes) and check off each exercise at the gym, then tap **Finish workout**
 - **Weight**: enter your weight once a week and see your trend chart and change since last week
 - **Past weeks**: workouts completed each of the last 8 weeks. Tap one to jump to that week
 
 ## Edit screen (✏️ Edit, top right)
 - Add, rename, reorder, and delete workouts (☰ opens a workout's exercise list for editing)
-- Change your weekly workout goal
+- Change your weekly workout goal (3× a week, rising to 4× starting the week of Nov 1)
 - Fix or delete weight entries
 - Set reminder times and add them to your calendar
 - Back up and restore your data
