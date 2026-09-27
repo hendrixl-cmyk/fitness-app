@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Weekly Fitness Tracker</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #16a34a;
+    --accent-soft: #dcfce7;
+    --warn: #d97706;
+    --danger: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --line: #334155;
+      --accent: #22c55e;
+      --accent-soft: #14532d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px 48px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .week-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .week-nav .label { text-align: center; flex: 1; }
+  .week-nav .label strong { display: block; }
+  .week-nav .label span { color: var(--muted); font-size: .85rem; }
+  button {
+    font: inherit;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.link { border: none; background: none; color: var(--muted); padding: 4px 6px; }
+
+  /* Workout progress */
+  .progress-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .big { font-size: 2rem; font-weight: 700; }
+  .status { font-size: .9rem; font-weight: 600; }
+  .status.ok { color: var(--accent); }
+  .status.todo { color: var(--warn); }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 8px 0 4px; }
+  .bar > div { height: 100%; background: var(--accent); transition: width .25s; }
+
+  /* Workout list */
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+  }
+  ul.list li:last-child { border-bottom: none; }
+  ul.list li .name { flex: 1; }
+  ul.list li.done .name { text-decoration: line-through; color: var(--muted); }
+  ul.list select { font: inherit; padding: 4px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .add-row { display: flex; gap: 8px; margin-top: 12px; }
+  .add-row input {
+    flex: 1; min-width: 0; font: inherit; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text);
+  }
+
+  /* Daily habits grid */
+  .grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .grid th, .grid td { text-align: center; padding: 6px 0; }
+  .grid th { font-size: .75rem; color: var(--muted); font-weight: 600; }
+  .grid th.today { color: var(--accent); }
+  .grid td.habit { text-align: left; font-size: .9rem; width: 34%; padding-right: 6px; }
+  .grid td.count { font-size: .8rem; color: var(--muted); width: 11%; }
+  .grid tr + tr td { border-top: 1px solid var(--line); }
+  .cell {
+    width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--line);
+    background: transparent; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700;
+  }
+  .cell.on { background: var(--accent); border-color: var(--accent); }
+  .cell.today { border-color: var(--accent); }
+  @media (max-width: 420px) {
+    .grid td.habit { width: 24%; font-size: .85rem; }
+    .cell { width: 28px; height: 28px; }
+  }
+  @media (max-width: 360px) {
+    .cell { width: 24px; height: 24px; }
+  }
+
+  /* History */
+  .history { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    font-size: .8rem; padding: 4px 8px; border-radius: 99px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .pill.hit { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .footer { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hendrix's Fitness Tracker</h1>
+  <div class="muted">Goal: 3+ workouts a week, eat right, supplements, 10K steps — every day.</div>
+
+  <section class="card week-nav">
+    <button id="prevWeek" aria-label="Previous week">&larr;</button>
+    <div class="label">
+      <strong id="weekTitle"></strong>
+      <span id="weekRange"></span>
+    </div>
+    <button id="nextWeek" aria-label="Next week">&rarr;</button>
+  </section>
+
+  <section class="card">
+    <div class="progress-head">
+      <h2>Workouts this week</h2>
+      <span id="workoutStatus" class="status"></span>
+    </div>
+    <div><span class="big" id="workoutCount">0</span> <span class="muted">/ <span id="workoutGoal">3</span> minimum</span></div>
+    <div class="bar"><div id="workoutBar"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>My workouts</h2>
+    <div class="muted" style="margin-bottom:8px">Check one off when you finish it and pick the day you did it.</div>
+    <ul class="list" id="workoutList"></ul>
+    <form class="add-row" id="addWorkoutForm">
+      <input id="newWorkout" placeholder="Add a workout (e.g. Push day)" maxlength="60">
+      <button class="primary" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Daily checklist</h2>
+    <table class="grid" id="habitGrid"></table>
+    <div class="muted" style="margin-top:8px">Tap a box to mark that day as a success.</div>
+  </section>
+
+  <section class="card">
+    <h2>Past weeks</h2>
+    <div class="history" id="history"></div>
+  </section>
+
+  <div class="footer">
+    <button id="todayBtn">Jump to this week</button>
+    <button id="exportBtn">Back up data</button>
+    <button id="importBtn">Restore backup</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </div>
+  <p class="muted" style="text-align:center">Your data is saved in this browser automatically.</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "fitness-tracker-v1";
+  const WORKOUT_GOAL = 3;
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const HABITS = [
+    { id: "eat",   label: "🥗 Ate right",    short: "🥗 Diet" },
+    { id: "supp",  label: "💊 Supplements", short: "💊 Supps" },
+    { id: "steps", label: "👟 10K steps",   short: "👟 10K" }
+  ];
+  const DEFAULT_PLAN = ["Upper body", "Lower body", "Full body / Cardio"];
+
+  // ---------- storage ----------
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && Array.isArray(data.plan) && data.weeks) return data;
+      }
+    } catch (e) { /* storage unavailable or corrupt: start fresh */ }
+    return { plan: DEFAULT_PLAN.map(name => ({ id: uid(), name })), weeks: {} };
+  }
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+
+  let state = load();
+
+  // ---------- dates ----------
+  function startOfWeek(d) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const offset = (x.getDay() + 6) % 7; // Monday = 0
+    x.setDate(x.getDate() - offset);
+    return x;
+  }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function key(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function fmt(d) { return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); }
+
+  const thisWeek = startOfWeek(new Date());
+  let currentWeek = thisWeek;
+
+  function getWeek(k, create) {
+    let w = state.weeks[k];
+    if (!w && create) {
+      w = state.weeks[k] = { workouts: {}, habits: {} };
+    }
+    if (w) {
+      w.workouts = w.workouts || {};
+      w.habits = w.habits || {};
+      HABITS.forEach(h => {
+        if (!Array.isArray(w.habits[h.id])) w.habits[h.id] = [false, false, false, false, false, false, false];
+      });
+    }
+    return w;
+  }
+
+  function workoutCount(w) {
+    if (!w) return 0;
+    return Object.keys(w.workouts).filter(id => w.workouts[id] && w.workouts[id].done).length;
+  }
+
+  // ---------- render ----------
+  const $ = id => document.getElementById(id);
+
+  function render() {
+    const wk = key(currentWeek);
+    const week = getWeek(wk, true);
+    const end = addDays(currentWeek, 6);
+    const isThisWeek = key(currentWeek) === key(thisWeek);
+    const todayIdx = isThisWeek ? (new Date().getDay() + 6) % 7 : -1;
+
+    $("weekTitle").textContent = isThisWeek ? "This week" : "Week of " + fmt(currentWeek);
+    $("weekRange").textContent = fmt(currentWeek) + " – " + fmt(end) + ", " + end.getFullYear();
+
+    // progress
+    const count = workoutCount(week);
+    $("workoutCount").textContent = count;
+    $("workoutGoal").textContent = WORKOUT_GOAL;
+    $("workoutBar").style.width = Math.min(100, (count / WORKOUT_GOAL) * 100) + "%";
+    const status = $("workoutStatus");
+    if (count >= WORKOUT_GOAL) {
+      status.textContent = "✅ Goal hit";
+      status.className = "status ok";
+    } else {
+      const left = WORKOUT_GOAL - count;
+      status.textContent = left + " more to go";
+      status.className = "status todo";
+    }
+
+    // workout list
+    const list = $("workoutList");
+    list.innerHTML = "";
+    if (state.plan.length === 0) {
+      const li = document.createElement("li");
+      li.innerHTML = '<span class="name muted">No workouts yet — add one below.</span>';
+      list.appendChild(li);
+    }
+    state.plan.forEach(item => {
+      const entry = week.workouts[item.id] || { done: false, day: todayIdx >= 0 ? todayIdx : 0 };
+      const li = document.createElement("li");
+      if (entry.done) li.className = "done";
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!entry.done;
+      cb.setAttribute("aria-label", "Completed " + item.name);
+      cb.addEventListener("change", () => {
+        const current = week.workouts[item.id] || { day: todayIdx >= 0 ? todayIdx : 0 };
+        current.done = cb.checked;
+        week.workouts[item.id] = current;
+        save(); render();
+      });
+
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.name;
+
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", "Day completed");
+      DAYS.forEach((d, i) => {
+        const o = document.createElement("option");
+        o.value = i; o.textContent = d;
+        if (i === entry.day) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.hidden = !entry.done;
+      sel.addEventListener("change", () => {
+        week.workouts[item.id] = Object.assign({}, entry, { day: Number(sel.value) });
+        save();
+      });
+
+      const del = document.createElement("button");
+      del.className = "link";
+      del.textContent = "✕";
+      del.title = "Remove workout";
+      del.setAttribute("aria-label", "Remove " + item.name);
+      del.addEventListener("click", () => {
+        if (!confirm('Remove "' + item.name + '" from your workout list?')) return;
+        state.plan = state.plan.filter(p => p.id !== item.id);
+        save(); render();
+      });
+
+      li.append(cb, name, sel, del);
+      list.appendChild(li);
+    });
+
+    // habit grid
+    const grid = $("habitGrid");
+    grid.innerHTML = "";
+    const head = document.createElement("tr");
+    head.appendChild(document.createElement("th"));
+    DAYS.forEach((d, i) => {
+      const th = document.createElement("th");
+      th.textContent = d.slice(0, 1) + (window.innerWidth > 420 ? d.slice(1) : "");
+      th.title = d + " " + fmt(addDays(currentWeek, i));
+      if (i === todayIdx) th.className = "today";
+      head.appendChild(th);
+    });
+    head.appendChild(document.createElement("th"));
+    grid.appendChild(head);
+
+    HABITS.forEach(h => {
+      const tr = document.createElement("tr");
+      const label = document.createElement("td");
+      label.className = "habit";
+      label.textContent = window.innerWidth > 420 ? h.label : h.short;
+      label.title = h.label;
+      tr.appendChild(label);
+      const days = week.habits[h.id];
+      days.forEach((on, i) => {
+        const td = document.createElement("td");
+        const b = document.createElement("button");
+        b.className = "cell" + (on ? " on" : "") + (i === todayIdx ? " today" : "");
+        b.textContent = on ? "✓" : "";
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        b.setAttribute("aria-label", h.label + " " + DAYS[i]);
+        b.addEventListener("click", () => {
+          days[i] = !days[i];
+          save(); render();
+        });
+        td.appendChild(b);
+        tr.appendChild(td);
+      });
+      const c = document.createElement("td");
+      c.className = "count";
+      c.textContent = days.filter(Boolean).length + "/7";
+      tr.appendChild(c);
+      grid.appendChild(tr);
+    });
+
+    // history (last 8 weeks before the one being viewed, most recent first)
+    const hist = $("history");
+    hist.innerHTML = "";
+    for (let i = 1; i <= 8; i++) {
+      const d = addDays(currentWeek, -7 * i);
+      const w = getWeek(key(d), false);
+      const n = workoutCount(w);
+      const pill = document.createElement("span");
+      pill.className = "pill" + (n >= WORKOUT_GOAL ? " hit" : "");
+      pill.textContent = fmt(d) + ": " + n + " 🏋️";
+      pill.title = "Click to view this week";
+      pill.style.cursor = "pointer";
+      pill.addEventListener("click", () => { currentWeek = d; render(); });
+      hist.appendChild(pill);
+    }
+  }
+
+  // ---------- events ----------
+  $("prevWeek").addEventListener("click", () => { currentWeek = addDays(currentWeek, -7); render(); });
+  $("nextWeek").addEventListener("click", () => { currentWeek = addDays(currentWeek, 7); render(); });
+  $("todayBtn").addEventListener("click", () => { currentWeek = thisWeek; render(); });
+
+  $("addWorkoutForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const input = $("newWorkout");
+    const name = input.value.trim();
+    if (!name) return;
+    state.plan.push({ id: uid(), name });
+    input.value = "";
+    save(); render();
+  });
+
+  $("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "fitness-tracker-backup-" + key(new Date()) + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    file.text().then(text => {
+      const data = JSON.parse(text);
+      if (!data || !Array.isArray(data.plan) || !data.weeks) throw new Error("bad file");
+      if (!confirm("Replace your current data with this backup?")) return;
+      state = data;
+      save(); render();
+    }).catch(() => alert("That file doesn't look like a tracker backup."));
+    e.target.value = "";
+  });
+
+  window.addEventListener("resize", render);
+  render();
+})();
+</script>
+</body>
+</html>
